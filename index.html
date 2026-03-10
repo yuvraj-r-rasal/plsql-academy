@@ -9,36 +9,13 @@
       rel="stylesheet"
     />
 
-    <!-- Firebase SDK -->
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-      import {
-        getAuth,
-        createUserWithEmailAndPassword,
-        signInWithEmailAndPassword,
-        signOut,
-        onAuthStateChanged,
-        updateProfile,
-      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-      import {
-        getFirestore,
-        doc,
-        setDoc,
-        getDoc,
-        updateDoc,
-        serverTimestamp,
-      } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-      // ── YOUR FIREBASE CONFIG ──────────────────────────────────────
-      // IMPORTANT: Replace this with your own Firebase config
-     
-      // Import the functions you need from the SDKs you need
-      import { initializeApp } from "firebase/app";
-      // TODO: Add SDKs for Firebase products that you want to use
-      // https://firebase.google.com/docs/web/setup#available-libraries
-
-      // Your web app's Firebase configuration
-      const firebaseConfig = {
+    <!-- ═══════════════════════════════════════════════════════
+     FIREBASE CONFIG — Edit ONLY the values inside { }
+     Get them from: Firebase Console → Project Settings
+     → Your Apps → Web App → firebaseConfig
+═══════════════════════════════════════════════════════ -->
+    <script>
+      window._FIREBASE_CONFIG = {
         apiKey: "AIzaSyCOftroFvtObs9ZBrAPw9AhrX8B48yexxc",
         authDomain: "plsql-academy.firebaseapp.com",
         projectId: "plsql-academy",
@@ -46,30 +23,95 @@
         messagingSenderId: "191594078029",
         appId: "1:191594078029:web:ed8a5fd357336754f26104",
       };
+    </script>
 
-      // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      // ─────────────────────────────────────────────────────────────
+    <!-- Firebase Compat SDK (no imports, no module conflicts) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-      const app = initializeApp(firebaseConfig);
-      const auth = getAuth(app);
-      const db = getFirestore(app);
+    <script>
+      (function () {
+        var cfg = window._FIREBASE_CONFIG;
+        var missing =
+          !cfg ||
+          Object.values(cfg).some(function (v) {
+            return (
+              !v || v.indexOf("REPLACE_WITH") === 0 || v.indexOf("YOUR_") >= 0
+            );
+          });
 
-      // ── Expose to global scope ──
-      window._firebase = {
-        auth,
-        db,
-        doc,
-        setDoc,
-        getDoc,
-        updateDoc,
-        serverTimestamp,
-        createUserWithEmailAndPassword,
-        signInWithEmailAndPassword,
-        signOut,
-        onAuthStateChanged,
-        updateProfile,
-      };
+        if (missing) {
+          console.warn("Firebase config not set — running in local mode");
+          window._firebaseReady = false;
+          return;
+        }
+
+        try {
+          // Prevent duplicate app error if script runs twice
+          var app = firebase.apps.length
+            ? firebase.apps[0]
+            : firebase.initializeApp(cfg);
+
+          var auth = firebase.auth(app);
+          var db = firebase.firestore(app);
+
+          // Wrap compat API to match the interface the app expects
+          window._firebase = {
+            auth: auth,
+            db: db,
+
+            // Auth methods
+            createUserWithEmailAndPassword: function (a, email, pass) {
+              return a.createUserWithEmailAndPassword(email, pass);
+            },
+            signInWithEmailAndPassword: function (a, email, pass) {
+              return a.signInWithEmailAndPassword(email, pass);
+            },
+            signOut: function (a) {
+              return a.signOut();
+            },
+            onAuthStateChanged: function (a, cb) {
+              return a.onAuthStateChanged(cb);
+            },
+            updateProfile: function (user, data) {
+              return user.updateProfile(data);
+            },
+
+            // Firestore helpers
+            doc: function (d, col, id) {
+              return d.collection(col).doc(id);
+            },
+            setDoc: function (ref, data) {
+              return ref.set(data);
+            },
+            getDoc: function (ref) {
+              return ref.get().then(function (snap) {
+                return {
+                  exists: function () {
+                    return snap.exists;
+                  },
+                  data: function () {
+                    return snap.data();
+                  },
+                };
+              });
+            },
+            updateDoc: function (ref, data) {
+              return ref.update(data);
+            },
+            serverTimestamp: function () {
+              return firebase.firestore.FieldValue.serverTimestamp();
+            },
+          };
+
+          window._firebaseReady = true;
+          console.log("Firebase ready ✓");
+        } catch (e) {
+          console.error("Firebase init failed:", e.message);
+          window._firebaseReady = false;
+        }
+      })();
     </script>
 
     <style>
@@ -5298,61 +5340,78 @@ END;
       const ITEMS_PER_LEVEL = 200;
 
       // ═══════════════════════════════════════════════════
-      // FIREBASE HELPERS — wait for SDK to load
+      // FIREBASE HELPERS
       // ═══════════════════════════════════════════════════
       function fb() {
         return window._firebase || null;
       }
 
       // ═══════════════════════════════════════════════════
-      // INIT
+      // INIT — Always require sign-in, no demo fallback
       // ═══════════════════════════════════════════════════
       window.addEventListener("load", () => {
+        // Always show auth screen immediately — NEVER demo mode
+        // Just wait for Firebase to confirm who is logged in
         let waited = 0;
         const waitFB = setInterval(() => {
           waited += 100;
-          if (window._firebase) {
+
+          // Firebase loaded and config is valid
+          if (window._firebaseReady === true) {
             clearInterval(waitFB);
+            hideLoading();
             initApp();
+            return;
           }
-          if (waited > 8000) {
+
+          // Firebase config is bad / placeholder values still in file
+          if (window._firebaseReady === false) {
             clearInterval(waitFB);
-            showLocalMode();
+            hideLoading();
+            showAuth();
+            showMsg(
+              "⚠️ Firebase config missing. Open your index.html, find the firebaseConfig block and paste your real values from Firebase Console.",
+              "error"
+            );
+            return;
+          }
+
+          // Still loading Firebase JS (normal, takes 1-3s on first load)
+          if (waited > 12000) {
+            // After 12s still nothing — show auth with error, no demo mode ever
+            clearInterval(waitFB);
+            hideLoading();
+            showAuth();
+            showMsg(
+              "⚠️ Could not connect to Firebase. Check your internet connection and Firebase config.",
+              "error"
+            );
           }
         }, 100);
       });
 
       function initApp() {
         const { auth, onAuthStateChanged } = fb();
+        // onAuthStateChanged tells us if user is already logged in or not
         onAuthStateChanged(auth, async (user) => {
           hideLoading();
           if (user) {
+            // Already signed in — go straight to app
             currentUser = user;
             await loadProgress();
             showApp();
           } else {
+            // Not signed in — show sign-in screen (ALWAYS)
             showAuth();
           }
         });
       }
 
-      function showLocalMode() {
-        // Fallback: run without Firebase (localStorage only)
-        hideLoading();
-        currentUser = {
-          uid: "local",
-          displayName: "Demo User",
-          email: "demo@local",
-        };
-        userProgress = JSON.parse(
-          localStorage.getItem("plsql_progress") || "{}"
-        );
-        totalXP = Object.values(userProgress).reduce(
-          (s, p) => s + (p.xp || 0),
-          0
-        );
-        showApp();
-        showToast("Running in local mode — progress saved to browser", "info");
+      function showMsg(text, type) {
+        const el = document.getElementById("authMsg");
+        if (!el) return;
+        el.className = "auth-msg " + type;
+        el.innerHTML = text;
       }
 
       function hideLoading() {
@@ -5439,11 +5498,11 @@ END;
           );
           await fb().updateProfile(cred.user, { displayName: name });
           // Create progress doc
-          const { db, doc, setDoc, serverTimestamp } = fb();
-          await setDoc(doc(db, "users", cred.user.uid), {
+          const f = fb();
+          await f.setDoc(f.doc(f.db, "users", cred.user.uid), {
             name,
             email,
-            createdAt: serverTimestamp(),
+            createdAt: f.serverTimestamp(),
             xp: 0,
             progress: {},
           });
@@ -5500,8 +5559,8 @@ END;
       async function loadProgress() {
         if (!fb() || !currentUser) return;
         try {
-          const { db, doc, getDoc } = fb();
-          const snap = await getDoc(doc(db, "users", currentUser.uid));
+          const f = fb();
+          const snap = await f.getDoc(f.doc(f.db, "users", currentUser.uid));
           if (snap.exists()) {
             const data = snap.data();
             userProgress = data.progress || {};
@@ -5532,8 +5591,8 @@ END;
         // Try Firebase
         if (fb() && currentUser && currentUser.uid !== "local") {
           try {
-            const { db, doc, updateDoc } = fb();
-            await updateDoc(doc(db, "users", currentUser.uid), {
+            const f = fb();
+            await f.updateDoc(f.doc(f.db, "users", currentUser.uid), {
               xp: totalXP,
               [`progress.${lessonId}`]: userProgress[lessonId],
             });
