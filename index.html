@@ -56,7 +56,7 @@
           var auth = firebase.auth(app);
           var db = firebase.firestore(app);
 
-          // Wrap compat  to match the interface the app expects
+          // Wrap compat API to match the interface the app expects
           window._firebase = {
             auth: auth,
             db: db,
@@ -6563,7 +6563,7 @@ Provide a structured code review with:
 Keep it encouraging, specific, and educational. Format with clear sections.`;
 
         try {
-          const res = await fetch("https://api.duck.ai/v1/chat", {
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -6673,7 +6673,7 @@ Student asks: "${q}"
 Give a clear, direct answer with a code example if relevant. Max 150 words. Be practical and specific to PL/SQL.`;
 
         try {
-          const res = await fetch("https://api.duck.ai/v1/chat", {
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
